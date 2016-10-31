@@ -1,3 +1,9 @@
+Enhancement
+===========
+**Fork which adapts the dialect SQL SERVER to add paginated to MS SQL Server 2008**
+
+-----
+
 Dashbuilder
 ===========
 
@@ -47,10 +53,10 @@ Change log
 * MariaDB support added to the SQL provider.
   (the provider has been tested under the MariaDB 10.1.10 release)
 
-* New data set filtering functions "IN" and "NOT IN" 
+* New data set filtering functions "IN" and "NOT IN"
 
 * Data Set Core API available as an embeddable java library
-  (further details [here](https://github.com/dgutierr/datasets-sample-project)) 
+  (further details [here](https://github.com/dgutierr/datasets-sample-project))
 
 0.3.0.Final
 
