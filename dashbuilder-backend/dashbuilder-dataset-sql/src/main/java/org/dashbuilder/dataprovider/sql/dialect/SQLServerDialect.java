@@ -17,10 +17,10 @@ package org.dashbuilder.dataprovider.sql.dialect;
 
 import java.sql.SQLException;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
-import java.util.ArrayList;
 
 import org.dashbuilder.dataprovider.sql.JDBCUtils;
 import org.dashbuilder.dataprovider.sql.model.Column;
@@ -70,18 +70,30 @@ public class SQLServerDialect extends DefaultDialect {
 	public String getCountQuerySQL(Select select) {
 		int offset = select.getOffset();
 		int limit = select.getLimit();
-		if (limit <= 0 && offset <= 0 && !select.getOrderBys().isEmpty()) {
-			List<SortColumn> sortColumns = new ArrayList<SortColumn>();
-			sortColumns.addAll(select.getOrderBys());
-			try {
-				// ORDER BY clauses within nested queries are not supported
-				select.getOrderBys().clear();
-				return "SELECT COUNT(*) FROM (" + select.getSQL() + ") \"dbSQL\"";
-			} finally {
-				select.orderBy(sortColumns);
+
+		List<Column> columns = new ArrayList<Column>();
+		columns.addAll(select.getColumns());
+
+		try {
+			
+			select.getColumns().clear();
+			
+			if (limit <= 0 && offset <= 0 && !select.getOrderBys().isEmpty()) {
+
+				List<SortColumn> sortColumns = new ArrayList<SortColumn>();
+				sortColumns.addAll(select.getOrderBys());
+				try {
+					// ORDER BY clauses within nested queries are not supported
+					select.getOrderBys().clear();
+					return "SELECT COUNT(*) FROM (" + select.getSQL() + ") \"dbSQL\"";
+				} finally {
+					select.orderBy(sortColumns);
+				}
 			}
+			return "SELECT COUNT(*) FROM (" + select.getSQL() + ") \"dbSQL\"";
+		} finally {
+			select.columns(columns);			
 		}
-		return "SELECT COUNT(*) FROM (" + select.getSQL() + ") \"dbSQL\"";
 	}
 
 	/**
@@ -118,13 +130,9 @@ public class SQLServerDialect extends DefaultDialect {
 				columns = fetchColumns(select);
 			}
 			if (!columns.isEmpty()) {
-				select.orderBy(columns.get(0).asc());
+				select.orderBy(columns.get(1).asc());
 			}
 		}
-
-		System.out.println("************************** Los limites son:");
-		System.out.println("Offset: " + offset);
-		System.out.println("Limit: " + limit);
 
 		return super.getSQL(select);
 	}
@@ -135,6 +143,7 @@ public class SQLServerDialect extends DefaultDialect {
 		try {
 			// Disable limits & fetch results
 			select.limit(0).offset(0);
+			
 			return JDBCUtils.getColumns(select.fetch(), null);
 		} catch (SQLException e) {
 			return Collections.emptyList();
@@ -163,7 +172,7 @@ public class SQLServerDialect extends DefaultDialect {
 			orderBy = " ORDER BY (SELECT 0) ";
 		}
 
-		return "WITH result_set AS ( SELECT ROW_NUMBER() OVER (" + orderBy + ") AS [row_number], ";
+		return "WITH result_set AS ( SELECT ROW_NUMBER() OVER (" + orderBy + ") AS rownumber, ";
 	}
 
 	@Override
@@ -171,11 +180,14 @@ public class SQLServerDialect extends DefaultDialect {
 		int offset = select.getOffset();
 		int limit = select.getLimit();
 		StringBuilder out = new StringBuilder();
-//		if (offset > 0) {
-			out.append(") ");
-			out.append(" SELECT * FROM result_set WHERE [row_number] BETWEEN ").append(offset).append(" AND ");
-			out.append(limit);
-//		}
+
+		out.append(") ");
+		//al offset se le sumna uno porque es inclusivo en el between
+		out.append(" SELECT * FROM result_set WHERE rownumber BETWEEN ").append(offset+1).append(" AND ");
+		
+		//El limite superior del between seria el offset mas el limite
+		out.append(offset+limit);
+
 		return out.toString();
 	}
 

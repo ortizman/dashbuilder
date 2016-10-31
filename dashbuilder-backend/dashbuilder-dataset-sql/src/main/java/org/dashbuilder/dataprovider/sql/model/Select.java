@@ -89,6 +89,7 @@ public class Select extends SQLStatement<Select> {
     }
 
     public Select columns(Collection<Column> cols) {
+    	
         for (Column column : cols) {
             columns.add(fix(column));
         }
