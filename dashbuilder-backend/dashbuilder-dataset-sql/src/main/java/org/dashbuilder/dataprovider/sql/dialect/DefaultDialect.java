@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright 2015 Red Hat, Inc. and/or its affiliates.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -49,6 +49,8 @@ import org.dashbuilder.dataset.sort.SortOrder;
 import static org.dashbuilder.dataprovider.sql.SQLFactory.*;
 
 public class DefaultDialect implements Dialect {
+
+    private static final String AND = " AND ";
 
     @Override
     public String[] getExcludedColumns() {
@@ -480,7 +482,7 @@ public class DefaultDialect implements Dialect {
     public String getBetweenConditionSQL(String column, Object from, Object to) {
         String fromStr = getParameterSQL(from);
         String toStr = getParameterSQL(to);
-        return column + " BETWEEN " + fromStr + " AND " + toStr;
+        return column + " BETWEEN " + fromStr + AND + toStr;
     }
 
     @Override
@@ -543,7 +545,9 @@ public class DefaultDialect implements Dialect {
 
     @Override
     public String getStringParameterSQL(String param) {
-        return "'" + param + "'";
+        // DASHBUILDE-113: SQL Injection on data set lookup filters
+        String escapedParam = param.replaceAll("'", "''");
+        return "'" + escapedParam + "'";
     }
 
     @Override
@@ -692,10 +696,10 @@ public class DefaultDialect implements Dialect {
         }
 
         // Order by
-        List<SortColumn> orderBys = select.getOrderBys();
-        if (!orderBys.isEmpty()) {
-            sql.append(" ").append(getOrderBySQL(select));
-        }
+//        List<SortColumn> orderBys = select.getOrderBys();
+//        if (!orderBys.isEmpty()) {
+//            sql.append(" ").append(getOrderBySQL(select));
+//        }
 
         // Limits
         int limit = select.getLimit();
@@ -820,7 +824,7 @@ public class DefaultDialect implements Dialect {
             if (first) {
                 sql.append(getWhereStatement(select)).append(" ");
             } else {
-                sql.append(" AND ");
+                sql.append(AND);
             }
             String str = getConditionSQL(condition);
             sql.append(str);
@@ -838,7 +842,7 @@ public class DefaultDialect implements Dialect {
             if (first) {
                 sql.append(getWhereStatement(delete)).append(" ");
             } else {
-                sql.append(" AND ");
+                sql.append(AND);
             }
             String str = getConditionSQL(condition);
             sql.append(str);

@@ -15,6 +15,11 @@
  */
 package org.dashbuilder.dataprovider.sql;
 
+import static org.dashbuilder.dataprovider.sql.SQLFactory.column;
+import static org.dashbuilder.dataprovider.sql.SQLFactory.table;
+import static org.junit.Assert.assertEquals;
+import static org.mockito.Mockito.when;
+
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 
@@ -24,10 +29,6 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.runners.MockitoJUnitRunner;
-
-import static org.junit.Assert.*;
-import static org.mockito.Mockito.*;
-import static org.dashbuilder.dataprovider.sql.SQLFactory.*;
 
 @RunWith(MockitoJUnitRunner.class)
 public class SelectStatementTest {
@@ -51,10 +52,69 @@ public class SelectStatementTest {
         Select select = new Select(connection, JDBCUtils.H2);
         select.columns(column("id"));
         select.from(table("table"));
-
+        
         assertEquals(select.getSQL(), "SELECT ID FROM TABLE");
     }
 
+    @Test
+    public void testFixSQLServerCase() throws Exception {
+        when(metadata.storesLowerCaseIdentifiers()).thenReturn(false);
+        when(metadata.storesUpperCaseIdentifiers()).thenReturn(true);
+
+        Select select = new Select(connection, JDBCUtils.SQLSERVER);
+        select.columns(column("r.*"));
+
+        select.offset(1);
+        select.limit(5);
+        
+        select.from("select r.*, mv.* FROM MappedVariable mv inner join ProcessInstanceLog pil on (pil.processInstanceId = mv.processInstanceId and pil.status = 3) inner join REQUEST r on (mv.variableId = r.requirement_id and mv.variableType = 'wissen.proyectoinversion.modelo.PedidoInversion') ");
+        
+        System.out.println(select.getSQL());
+        
+        assertEquals(select.getSQL(), "WITH result_set AS ( SELECT ROW_NUMBER() OVER (ORDER BY REQUIREMENT_ID ASC ) AS [row_number],  REQUIREMENT_ID, COMPANYID, REQUIREMENT_STATE, MAP_VAR_ID FROM (SELECT R.*, MV.* FROM MAPPEDVARIABLE MV INNER JOIN PROCESSINSTANCELOG PIL ON (PIL.PROCESSINSTANCEID = MV.PROCESSINSTANCEID AND PIL.STATUS = 3) INNER JOIN REQUEST R ON (MV.VARIABLEID = R.REQUIREMENT_ID AND MV.VARIABLETYPE = 'wissen.proyectoinversion.modelo.PedidoInversion') ) \"dbSQL\")  SELECT * FROM result_set WHERE [row_number] BETWEEN 1 AND 5");
+    }
+    
+    @Test
+    public void testCountSQLServer() throws Exception {
+        when(metadata.storesLowerCaseIdentifiers()).thenReturn(false);
+        when(metadata.storesUpperCaseIdentifiers()).thenReturn(true);
+
+        Select select = new Select(connection, JDBCUtils.SQLSERVER);
+        select.columns(column("r.requirement_id"));
+
+        select.offset(0);
+        select.limit(0);
+        
+        select.from("select r.*, mv.* FROM MappedVariable mv inner join ProcessInstanceLog pil on (pil.processInstanceId = mv.processInstanceId and pil.status = 3) inner join REQUEST r on (mv.variableId = r.requirement_id and mv.variableType = 'wissen.proyectoinversion.modelo.PedidoInversion') ");
+        
+        String countQuerySQL = JDBCUtils.SQLSERVER.getCountQuerySQL(select);
+        
+        System.out.println(countQuerySQL);
+        
+        System.out.println(select.getSQL());
+        
+        assertEquals(select.getSQL(), "WITH result_set AS ( SELECT ROW_NUMBER() OVER (ORDER BY REQUIREMENT_ID ASC ) AS [row_number],  REQUIREMENT_ID, COMPANYID, REQUIREMENT_STATE, MAP_VAR_ID FROM (SELECT R.*, MV.* FROM MAPPEDVARIABLE MV INNER JOIN PROCESSINSTANCELOG PIL ON (PIL.PROCESSINSTANCEID = MV.PROCESSINSTANCEID AND PIL.STATUS = 3) INNER JOIN REQUEST R ON (MV.VARIABLEID = R.REQUIREMENT_ID AND MV.VARIABLETYPE = 'wissen.proyectoinversion.modelo.PedidoInversion') ) \"dbSQL\")  SELECT * FROM result_set WHERE [row_number] BETWEEN 1 AND 5");
+    }
+    
+    @Test
+    public void testSQLServerOrderBy() throws Exception {
+        when(metadata.storesLowerCaseIdentifiers()).thenReturn(false);
+        when(metadata.storesUpperCaseIdentifiers()).thenReturn(true);
+
+        Select select = new Select(connection, JDBCUtils.SQLSERVER);
+        select.columns(column("requirement_id"));
+        select.columns(column("companyId"));
+        select.columns(column("requirement_state"));
+        select.columns(column("MAP_VAR_ID"));
+        select.orderBy(column("companyId").asc());
+        select.offset(3);
+        select.limit(5);
+        
+        select.from("select r.*, mv.* FROM MappedVariable mv inner join ProcessInstanceLog pil on (pil.processInstanceId = mv.processInstanceId and pil.status = 3) inner join REQUEST r on (mv.variableId = r.requirement_id and mv.variableType = 'wissen.proyectoinversion.modelo.PedidoInversion') ");
+        
+        assertEquals(select.getSQL(), "WITH result_set AS ( SELECT ROW_NUMBER() OVER (ORDER BY COMPANYID ASC ) AS [row_number],  REQUIREMENT_ID, COMPANYID, REQUIREMENT_STATE, MAP_VAR_ID FROM (SELECT R.*, MV.* FROM MAPPEDVARIABLE MV INNER JOIN PROCESSINSTANCELOG PIL ON (PIL.PROCESSINSTANCEID = MV.PROCESSINSTANCEID AND PIL.STATUS = 3) INNER JOIN REQUEST R ON (MV.VARIABLEID = R.REQUIREMENT_ID AND MV.VARIABLETYPE = 'wissen.proyectoinversion.modelo.PedidoInversion') ) \"dbSQL\")  SELECT * FROM result_set WHERE [row_number] BETWEEN 3 AND 5");
+    }
+    
     @Test
     public void testKeepColumnAsIs() throws Exception {
         when(metadata.storesLowerCaseIdentifiers()).thenReturn(false);

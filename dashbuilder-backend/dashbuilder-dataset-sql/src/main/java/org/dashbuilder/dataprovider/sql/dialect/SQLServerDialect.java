@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright 2015 Red Hat, Inc. and/or its affiliates.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -32,127 +32,151 @@ import org.dashbuilder.dataprovider.sql.model.SortColumn;
  */
 public class SQLServerDialect extends DefaultDialect {
 
-    @Override
-    public String getColumnTypeSQL(Column column) {
-        switch (column.getType()) {
-            case NUMBER: {
-                return "NUMERIC(28,2)";
-            }
-            case DATE: {
-                return "DATETIME";
-            }
-            default: {
-                return "VARCHAR(" + column.getLength() + ")";
-            }
-        }
-    }
+	@Override
+	public String getColumnTypeSQL(Column column) {
+		switch (column.getType()) {
+		case NUMBER: {
+			return "NUMERIC(28,2)";
+		}
+		case DATE: {
+			return "DATETIME";
+		}
+		default: {
+			return "VARCHAR(" + column.getLength() + ")";
+		}
+		}
+	}
 
-    @Override
-    public String getConcatFunctionSQL(Column[] columns) {
-        return super.getConcatFunctionSQL(columns, "CONCAT(", ")", ",");
-    }
+	@Override
+	public String getConcatFunctionSQL(Column[] columns) {
+		return super.getConcatFunctionSQL(columns, "CONCAT(", ")", ",");
+	}
 
-    @Override
-    public String getDatePartFunctionSQL(String part, Column column) {
-        String columnSQL = getColumnSQL(column);
-        return "DATEPART(" + part + "," + columnSQL + ")";
-    }
+	@Override
+	public String getDatePartFunctionSQL(String part, Column column) {
+		String columnSQL = getColumnSQL(column);
+		return "DATEPART(" + part + "," + columnSQL + ")";
+	}
 
-    SimpleDateFormat sqlServerDateFormat = new SimpleDateFormat("yyyyMMdd HH:mm:ss");
+	SimpleDateFormat sqlServerDateFormat = new SimpleDateFormat("yyyyMMdd HH:mm:ss");
 
-    @Override
-    public String getDateParameterSQL(Date param) {
-        // '2015-08-24 13:14:36'
-        return "'" + sqlServerDateFormat.format(param) + "'";
-    }
+	@Override
+	public String getDateParameterSQL(Date param) {
+		// '2015-08-24 13:14:36'
+		return "'" + sqlServerDateFormat.format(param) + "'";
+	}
 
-    @Override
-    public String getCountQuerySQL(Select select) {
-        int offset = select.getOffset();
-        int limit = select.getLimit();
-        if (limit <= 0 && offset <= 0 && !select.getOrderBys().isEmpty()) {
-            List<SortColumn> sortColumns = new ArrayList<SortColumn>();
-            sortColumns.addAll(select.getOrderBys());
-            try {
-                // ORDER BY clauses within nested queries are not supported
-                select.getOrderBys().clear();
-                return "SELECT COUNT(*) FROM (" + select.getSQL() + ") \"dbSQL\"";
-            } finally {
-                select.orderBy(sortColumns);
-            }
-        }
-        return "SELECT COUNT(*) FROM (" + select.getSQL() + ") \"dbSQL\"";
-    }
+	@Override
+	public String getCountQuerySQL(Select select) {
+		int offset = select.getOffset();
+		int limit = select.getLimit();
+		if (limit <= 0 && offset <= 0 && !select.getOrderBys().isEmpty()) {
+			List<SortColumn> sortColumns = new ArrayList<SortColumn>();
+			sortColumns.addAll(select.getOrderBys());
+			try {
+				// ORDER BY clauses within nested queries are not supported
+				select.getOrderBys().clear();
+				return "SELECT COUNT(*) FROM (" + select.getSQL() + ") \"dbSQL\"";
+			} finally {
+				select.orderBy(sortColumns);
+			}
+		}
+		return "SELECT COUNT(*) FROM (" + select.getSQL() + ") \"dbSQL\"";
+	}
 
-    /**
-     * Since SQL Server 2012 pagination queries are resolved as follows:
-     *
-     * <ul>
-     *      <li>1. offset <= 0 limit > 0</li>
-     *      <p>SELECT <b>TOP limit</b> * FROM "EXPENSE_REPORTS"</p>
-     *
-     *      <li>2. offset > 0 limit > 0</li>
-     *
-     *      <p>SELECT * FROM "EXPENSE_REPORTS" ORDER BY DEPARTMENT <b>OFFSET offset ROWS FETCH NEXT limit ROWS ONLY</b></p>
-     *      <p>This second case requires a mandatory order by clause.</p>
-     * </ul>
-     *
-     * The methods below implement the above requirements.
-     */
+	/**
+	 * Since SQL Server 2012 pagination queries are resolved as follows:
+	 *
+	 * <ul>
+	 * <li>1. offset <= 0 limit > 0</li>
+	 * <p>
+	 * SELECT <b>TOP limit</b> * FROM "EXPENSE_REPORTS"
+	 * </p>
+	 *
+	 * <li>2. offset > 0 limit > 0</li>
+	 *
+	 * <p>
+	 * SELECT * FROM "EXPENSE_REPORTS" ORDER BY DEPARTMENT <b>OFFSET offset ROWS
+	 * FETCH NEXT limit ROWS ONLY</b>
+	 * </p>
+	 * <p>
+	 * This second case requires a mandatory order by clause.
+	 * </p>
+	 * </ul>
+	 *
+	 * The methods below implement the above requirements.
+	 */
 
-    @Override
-    public String getSQL(Select select) {
-        int offset = select.getOffset();
-        int limit = select.getLimit();
-        if ((limit > 0 || offset > 0) && select.getOrderBys().isEmpty()) {
-            List<Column> columns = select.getColumns();
-            if (columns.isEmpty()) {
-                columns = fetchColumns(select);
-            }
-            if (!columns.isEmpty()) {
-                select.orderBy(columns.get(0).asc());
-            }
-        }
-        return super.getSQL(select);
-    }
+	@Override
+	public String getSQL(Select select) {
+		int offset = select.getOffset();
+		int limit = select.getLimit();
 
-    public List<Column> fetchColumns(Select select) {
-        int offset = select.getOffset();
-        int limit = select.getLimit();
-        try {
-            // Disable limits & fetch results
-            select.limit(0).offset(0);
-            return JDBCUtils.getColumns(select.fetch(), null);
-        }
-        catch (SQLException e) {
-            return Collections.emptyList();
-        }
-        finally {
-            // Restore original limits
-            select.limit(limit).offset(offset);
-        }
-    }
+		if ((limit > 0 || offset > 0) && select.getOrderBys().isEmpty()) {
+			List<Column> columns = select.getColumns();
+			if (columns.isEmpty()) {
+				columns = fetchColumns(select);
+			}
+			if (!columns.isEmpty()) {
+				select.orderBy(columns.get(0).asc());
+			}
+		}
 
-    @Override
-    public String getSelectStatement(Select select) {
-        int offset = select.getOffset();
-        int limit = select.getLimit();
-        if (offset <= 0 && limit > 0) {
-            return "SELECT TOP " + limit;
-        } else {
-            return "SELECT";
-        }
-    }
+		System.out.println("************************** Los limites son:");
+		System.out.println("Offset: " + offset);
+		System.out.println("Limit: " + limit);
 
-    @Override
-    public String getOffsetLimitSQL(Select select) {
-        int offset = select.getOffset();
-        int limit = select.getLimit();
-        StringBuilder out = new StringBuilder();
-        if (offset > 0) {
-            if (offset > 0) out.append(" OFFSET ").append(offset).append(" ROWS");
-            if (limit > 0) out.append(" FETCH FIRST ").append(limit).append(" ROWS ONLY");
-        }
-        return out.toString();
-    }
+		return super.getSQL(select);
+	}
+
+	public List<Column> fetchColumns(Select select) {
+		int offset = select.getOffset();
+		int limit = select.getLimit();
+		try {
+			// Disable limits & fetch results
+			select.limit(0).offset(0);
+			return JDBCUtils.getColumns(select.fetch(), null);
+		} catch (SQLException e) {
+			return Collections.emptyList();
+		} finally {
+			// Restore original limits
+			select.limit(limit).offset(offset);
+		}
+	}
+
+	@Override
+	public String getSelectStatement(Select select) {
+		int offset = select.getOffset();
+		int limit = select.getLimit();
+
+		if (limit <= 0 && offset <= 0) {
+			return "SELECT";
+		}
+
+		// Order by
+		String orderBy = null;
+		List<SortColumn> orderBys = select.getOrderBys();
+		if (!orderBys.isEmpty()) {
+			orderBy = getOrderBySQL(select).concat(" ");
+		} else {
+			// ES NECESARIO ESPECIFICAR EL ORDER BY DENTRO DE 'OVER'
+			orderBy = " ORDER BY (SELECT 0) ";
+		}
+
+		return "WITH result_set AS ( SELECT ROW_NUMBER() OVER (" + orderBy + ") AS [row_number], ";
+	}
+
+	@Override
+	public String getOffsetLimitSQL(Select select) {
+		int offset = select.getOffset();
+		int limit = select.getLimit();
+		StringBuilder out = new StringBuilder();
+//		if (offset > 0) {
+			out.append(") ");
+			out.append(" SELECT * FROM result_set WHERE [row_number] BETWEEN ").append(offset).append(" AND ");
+			out.append(limit);
+//		}
+		return out.toString();
+	}
+
 }
